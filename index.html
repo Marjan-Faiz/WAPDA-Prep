@@ -24,11 +24,12 @@ ul{margin:6px 0 6px 18px;padding:0}li{margin:3px 0}
 input[type=number],input[type=date],textarea{font:inherit;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:7px}
 textarea{width:100%;min-height:70px}
 .g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.g .card{text-align:center;margin:0}.g b{font-size:22px;display:block}
+.md h3{font-size:14px;margin:10px 0 4px}.md p{margin:4px 0}
 .dt{background:var(--bg);border-radius:8px;padding:6px 10px;margin-top:8px}.dt p{margin:6px 0}
 .tag{font-size:11px;background:var(--ac2);color:var(--ac);padding:1px 7px;border-radius:9px;margin-left:6px}
 </style></head><body><div class="w">
 <h1>WAPDA Prep Tracker</h1><div class="mu" id="hd"></div>
-<nav><button data-v="today" class="on">Today</button><button data-v="topics">Notes</button><button data-v="prog">Progress</button></nav>
+<nav><button data-v="today" class="on">Today</button><button data-v="topics">Notes</button><button data-v="mine">My Notes</button><button data-v="prog">Progress</button></nav>
 <div id="app"></div></div>
 <script>
 var T=[
@@ -72,14 +73,25 @@ var D=[
 ["Arithmetic — Percentage change = (new − old)/old × 100. Average = sum/count; simple interest I = PRT/100; compound A = P(1 + r/n)^(nt).","Speed and work — Distance = speed × time; km/h to m/s multiply by 5/18. Work: 1/a + 1/b = 1/t. Pipes and cisterns follow the same rule; trains use relative speed.","Algebra and geometry — (a + b)² = a² + 2ab + b²; quadratic x = (−b ± √(b² − 4ac))/2a. Triangle ½bh, circle πr², cylinder volume πr²h, Pythagoras a² + b² = c².","Reasoning — Number and letter series, analogies, coding-decoding, blood relations, directions, syllogisms. Practise under a timer.","Strategy — Solve easy questions first and skip long ones; check the advertisement for negative marking."]
 ];
 function det(i){return'<details class="dt"><summary>Detailed notes</summary>'+D[i].map(function(s){var k=s.split(" — ");return'<p><b>'+esc(k[0])+'</b> — '+esc(k.slice(1).join(" — "))+'</p>'}).join("")+'</details>'}
+var PROMPT='You are a tutor preparing a Pakistani civil engineering graduate for the WAPDA recruitment test (Civil Engineer post). Write exam-focused notes on the topic below. Use Pakistan standards and context where relevant: PEC, Building Code of Pakistan (BCP SP-2007), ACI 318 as used in Pakistan, MPa and psi units, Pakistan water and power sector, WAPDA projects. Use simple English with short Roman Urdu hints for hard ideas. Use this structure with markdown headings: ## Key concepts, ## Formulas and values to memorize, ## Pakistan standards and context, ## Common test traps, ## 10 practice MCQs (each with options A to D and the answer). Be accurate, and write verify next to any figure you are not sure of. Keep it under 700 words. Topic: ';
+function fmt(s){var o='',inl=false;esc(s).split('\n').forEach(function(l){var li=/^\s*[-*] (.*)/.exec(l);if(li){if(!inl){o+='<ul>';inl=true}o+='<li>'+li[1]+'</li>'}else{if(inl){o+='</ul>';inl=false}if(/^#+ /.test(l))o+='<h3>'+l.replace(/^#+ /,'')+'</h3>';else if(l.trim())o+='<p>'+l+'</p>'}});if(inl)o+='</ul>';return o.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')}
+function aiCard(i){return'<div class="card"><h2>'+esc(S.ai[i].q)+'<span class="tag">AI notes</span></h2><div class="md">'+fmt(S.ai[i].a)+'</div></div>'}
+async function ask(){var q=document.getElementById('aq').value.trim(),st=document.getElementById('as');if(!q)return;
+ if(!window.claude||!window.claude.use){st.textContent='This feature works only on the claude.ai link, not on GitHub.';return}
+ st.textContent='Notes are being prepared...';
+ try{var sm=await window.claude.use('sample');if(!sm){st.textContent='Not available. Open the claude.ai link while signed in.';return}
+  var r=await sm(PROMPT+q,{cache:false});
+  S.ai.push({q:q,a:r.text,day:cur});var idx=S.ai.length-1;(S.extra[cur]=S.extra[cur]||[]).push({id:cur+'x'+idx,t:'Study: '+q,ai:idx});save();render();
+ }catch(e){st.textContent='Error: '+((e&&e.message)||e)}}
 var N=T.length,DAYS=60,S={},KEY="wapda-prep-v1";
 try{S=JSON.parse(localStorage.getItem(KEY)||"{}")}catch(e){}
-S.done=S.done||{};S.min=S.min||{};S.conf=S.conf||{};S.notes=S.notes||{};
+S.done=S.done||{};S.min=S.min||{};S.conf=S.conf||{};S.notes=S.notes||{};S.ai=S.ai||[];S.extra=S.extra||{};
 if(!S.start){S.start=new Date().toISOString().slice(0,10)}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function dn(){var d=Math.floor((new Date(new Date().toISOString().slice(0,10))-new Date(S.start))/864e5)+1;return Math.max(1,Math.min(DAYS,d))}
 var cur=dn(),view="today";
-function plan(d){
+function plan(d){return plan0(d).concat((S.extra[d]||[]).map(function(x){return{id:x.id,t:x.t,tp:null,ai:x.ai}}))}
+function plan0(d){
  var a=(2*(d-1))%N,b=(2*(d-1)+1)%N,r=Math.floor((2*(d-1))/N)+1,L=[];
  if(d>=57){L.push({id:d+"r1",t:"Final revision: read all Civil notes once",tp:null});L.push({id:d+"r2",t:"Final revision: WAPDA, Pakistan Studies, English, Math",tp:null});L.push({id:d+"m",t:"Full-length mock (100 MCQs, timed) + review every mistake",tp:null});return L}
  L.push({id:d+"a",t:"Learn: "+T[a][0],tp:a});L.push({id:d+"b",t:"Learn: "+T[b][0],tp:b});
@@ -101,8 +113,13 @@ function render(){
   p.forEach(function(x){h+='<label class="t'+(S.done[x.id]?' d':'')+'"><input type="checkbox" data-id="'+x.id+'"'+(S.done[x.id]?' checked':'')+'><span>'+esc(x.t)+(x.tp!=null?'<span class="tag">'+T[x.tp][1]+'</span>':'')+'</span></label>'});
   h+='</div>';
   var seen={};p.forEach(function(x){if(x.tp!=null&&!seen[x.tp]){seen[x.tp]=1;h+='<div class="card"><h2>'+T[x.tp][0]+'</h2><ul>'+T[x.tp].slice(2).map(function(n){return'<li>'+esc(n)+'</li>'}).join("")+'</ul>'+det(x.tp)+'</div>'}});
+  p.forEach(function(x){if(x.ai!=null&&S.ai[x.ai])h+=aiCard(x.ai)});
+  h+='<div class="card"><h2>Aaj kya parhna hai?</h2><div class="row"><input type="text" id="aq" placeholder="e.g. Consolidation of soil" style="flex:1;min-width:150px;font:inherit;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:8px"><button class="b p" id="ask" style="flex:none">Get notes</button></div><div class="mu" id="as" style="margin-top:6px">Type any topic. Notes are made for the WAPDA test with Pakistan standards, added to today as a task, and saved in My Notes.</div></div>';
   h+='<div class="card"><h2>Study time today</h2><div class="row"><input type="number" id="mn" min="0" step="15" placeholder="minutes" value="'+(S.min[cur]||"")+'"><span class="mu">minutes studied</span></div></div>';
   h+='<div class="card"><h2>Weak points / mistakes</h2><textarea id="nt" placeholder="Write what you got wrong or found hard">'+esc(S.notes[cur]||"")+'</textarea></div>';
+ }else if(view=="mine"){
+  if(!S.ai.length)h+='<div class="card mu">No saved notes yet. Ask for a topic in the Today tab.</div>';
+  for(var i=S.ai.length-1;i>=0;i--)h+=aiCard(i);
  }else if(view=="topics"){
   T.forEach(function(t,i){var c=S.conf[i]||0;h+='<div class="card"><details><summary>'+t[0]+'<span class="tag">'+t[1]+'</span></summary><ul>'+t.slice(2).map(function(n){return'<li>'+esc(n)+'</li>'}).join("")+'</ul>'+det(i)+'<div class="row mu">Confidence: '+[1,2,3].map(function(k){return'<button class="b'+(c==k?' p':'')+'" style="flex:none;padding:4px 12px" data-c="'+i+'_'+k+'">'+["Weak","OK","Strong"][k-1]+'</button>'}).join("")+'</div></details></div>'});
   h+='<p class="mu">Key points are quick-revision notes. Check numbers and syllabus against the official WAPDA advertisement for your post.</p>';
@@ -121,6 +138,7 @@ var A=document.getElementById("app");
 A.onclick=function(e){var t=e.target;
  if(t.id=="pv"&&cur>1){cur--;render()}
  if(t.id=="nx"&&cur<DAYS){cur++;render()}
+ if(t.id=="ask")ask();
  if(t.dataset.c){var a=t.dataset.c.split("_");S.conf[a[0]]=+a[1];save();render()}};
 A.onchange=function(e){var t=e.target;
  if(t.dataset.id){S.done[t.dataset.id]=t.checked;save();render()}
